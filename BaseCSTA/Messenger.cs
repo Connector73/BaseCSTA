@@ -17,7 +17,7 @@ using Windows.Web;
 
 namespace BaseCSTA
 {
-    public enum ConnectType { Plain, TLS, WebSocket, WebSocketSecure };
+    public enum ConnectType { Plain, Secure, WebSocket, WebSocketSecure };
 
     public class Messenger : ICSTAEvent
     {
@@ -69,16 +69,14 @@ namespace BaseCSTA
             }
         }
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         public async Task<bool> ExecuteHandler(string cmdName, Dictionary<string, string> parameters)
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
             object cmd;
             if (commands.TryGetValue(cmdName, out cmd))
             {
                 CSTACommand command = (CSTACommand)cmd;
                 command.parameters = parameters;
-                sendText(command.cmdBody());
+                await sendText(command.cmdBody());
                 return true;
             }
             return false;
@@ -140,7 +138,7 @@ namespace BaseCSTA
                         return false;
                     }
                     break;
-                case ConnectType.TLS:
+                case ConnectType.Secure:
                     socket = new StreamSocket();
                     socket.Control.KeepAlive = false;
                     socket.Control.ClientCertificate = null;
@@ -371,7 +369,7 @@ namespace BaseCSTA
         /// <param name="squenceStr">CSTA command squence number string</param>
         /// <param name="messageStr">CSTA command message string</param>
         /// <returns></returns>
-        private void parseMessage(string sequnceStr, string messageStr)
+        private async Task parseMessage(string sequnceStr, string messageStr)
         {
             Debug.WriteLine("CSTA", messageStr);
             using (XmlReader reader = XmlReader.Create(new System.IO.StringReader(messageStr)))
@@ -473,7 +471,7 @@ namespace BaseCSTA
                                 loginCmd.events["loginFailed"] = null;
                                 // set cleartext flag
                                 loginCmd.clearTextPassword = true;
-                                sendText(loginCmd.cmdBody());
+                                await sendText(loginCmd.cmdBody());
                                 return; // do not send envent until second login attempt will be done
                             }
                         }
@@ -551,7 +549,7 @@ namespace BaseCSTA
 
                     // Do something with the data.
                     string receivedStr = Encoding.UTF8.GetString(readBuffer, 0, actualMessageLength);
-                    parseMessage(receivedStr.Substring(0, 4), receivedStr.Substring(4, receivedStr.Length - 4));
+                    await parseMessage(receivedStr.Substring(0, 4), receivedStr.Substring(4, receivedStr.Length - 4));
                 }
             }
             catch (ObjectDisposedException)
@@ -631,7 +629,7 @@ namespace BaseCSTA
         /// </summary>
         /// <param name="text">CSTA command message string</param>
         /// <returns></returns>
-        private async void sendText(string text)
+        private async Task sendText(string text)
         {
             if (!CoreApplication.Properties.ContainsKey("connected"))
             {
@@ -681,15 +679,13 @@ namespace BaseCSTA
             return;
         }
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         /// <summary>
         /// Login to MX sever
         /// </summary>
         /// <param name="login">Login name</param>
         /// <param name="password">Password</param>
         /// <returns></returns>
-        public async void Login(string login, string password)
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
+        public async Task Login(string login, string password)
         {
             LoginCommand loginCmd = (LoginCommand)commands["login"];
             loginCmd.parameters["type"] = "User";
@@ -697,14 +693,12 @@ namespace BaseCSTA
             loginCmd.parameters["userName"] = login;
             loginCmd.parameters["version"] = "7.0";
             loginCmd.parameters["pwd"] = password;
-            sendText(loginCmd.cmdBody());
+            await sendText(loginCmd.cmdBody());
         }
 
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
         private async Task KeepAlive()
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            sendText("<?xml version=\"1.0\" encoding=\"utf-8\"?><keepalive/>");
+            await sendText("<?xml version=\"1.0\" encoding=\"utf-8\"?><keepalive/>");
         }
     }
 }

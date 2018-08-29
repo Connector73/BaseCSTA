@@ -76,10 +76,10 @@ namespace UnitTests
         [TestMethod]
         public void TestLogin()
         {
-            Task v = csta.Connect("631hc.connector73.net", "7778", ConnectType.TLS);
+            Task v = csta.Connect("631hc.connector73.net", "7778", ConnectType.Secure);
             v.Wait();
             csta.AddHandler(new Presence());
-            csta.Login("maximd", "ihZ6nW62");
+            csta.Login("maximd", "ihZ6nW62").Wait();
             Task.Delay(TimeSpan.FromSeconds(20)).Wait();
             csta.Disconnect();
         }
@@ -87,10 +87,10 @@ namespace UnitTests
         [TestMethod]
         public void TestLoginFail()
         {
-            Task v = csta.Connect("631hc.connector73.net", "7778", ConnectType.TLS);
+            Task v = csta.Connect("631hc.connector73.net", "7778", ConnectType.Secure);
             v.Wait();
             csta.AddHandler(new Presence());
-            csta.Login("maximd", "12345");
+            csta.Login("maximd", "12345").Wait();
             Task.Delay(TimeSpan.FromSeconds(10)).Wait();
             csta.Disconnect();
         }
@@ -98,11 +98,11 @@ namespace UnitTests
         [TestMethod]
         public void TestAddressBook()
         {
-            Task v = csta.Connect("631hc.connector73.net", "7778", ConnectType.TLS);
+            Task v = csta.Connect("631hc.connector73.net", "7778", ConnectType.Secure);
             v.Wait();
             csta.AddHandler(new GetAddressBook());
             csta.AddHandler(new Presence());
-            csta.Login("maximd", "ihZ6nW62");
+            csta.Login("maximd", "ihZ6nW62").Wait();
             Task.Delay(TimeSpan.FromSeconds(10)).Wait();
 
             v = csta.ExecuteHandler("ablist", null);
@@ -115,13 +115,13 @@ namespace UnitTests
         [TestMethod]
         public void TestBuddyList()
         {
-            Task v = csta.Connect("631hc.connector73.net", "7778", ConnectType.TLS);
+            Task v = csta.Connect("631hc.connector73.net", "7778", ConnectType.Secure);
             v.Wait();
             csta.AddHandler(new GetFavorites());
             csta.AddHandler(new AddFavority());
             csta.AddHandler(new RemoveFavority());
             csta.AddHandler(new Presence());
-            csta.Login("maximd", "ihZ6nW62");
+            csta.Login("maximd", "ihZ6nW62").Wait();
             Task.Delay(TimeSpan.FromSeconds(5)).Wait();
 
             Debug.WriteLine("Initial:");
@@ -178,12 +178,12 @@ namespace UnitTests
         [TestMethod]
         public void TestIntantMessaging()
         {
-            Task v = csta.Connect("631hc.connector73.net", "7778", ConnectType.TLS);
+            Task v = csta.Connect("631hc.connector73.net", "7778", ConnectType.Secure);
             v.Wait();
             csta.AddHandler(new MessageHistory());
             csta.AddHandler(new MessageAck());
             csta.AddHandler(new SendMessage());
-            csta.Login("maximd", "ihZ6nW62");
+            csta.Login("maximd", "ihZ6nW62").Wait();
             Task.Delay(TimeSpan.FromSeconds(5)).Wait();
 
             Debug.WriteLine("Get IM History");
