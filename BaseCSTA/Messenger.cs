@@ -69,17 +69,17 @@ namespace BaseCSTA
             }
         }
 
-        public async Task<bool> ExecuteHandler(string cmdName, Dictionary<string, string> parameters)
+        public async Task<int> ExecuteHandler(string cmdName, Dictionary<string, string> parameters)
         {
             object cmd;
             if (commands.TryGetValue(cmdName, out cmd))
             {
                 CSTACommand command = (CSTACommand)cmd;
                 command.parameters = parameters;
-                await sendText(command.cmdBody());
-                return true;
+                int sequence = await sendText(command.cmdBody());
+                return sequence;
             }
-            return false;
+            return -1;
         }
 
         /// <summary>
@@ -485,9 +485,11 @@ namespace BaseCSTA
                     EventHandler handler = cstaEvent;
                     if (handler != null && command != null)
                     {
-                        handler(this, new CSTAEventArgs(command.eventName, (Dictionary<string, object>)command.events[command.eventName]));
+                        int numValue;
+                        bool parsed = Int32.TryParse(sequnceStr, out numValue);
+                        if (!parsed) numValue = 9999;
+                        handler(this, new CSTAEventArgs(command.eventName, numValue, (Dictionary<string, object>)command.events[command.eventName]));
                     }
-
                 }
             }
         }
@@ -607,13 +609,13 @@ namespace BaseCSTA
             }
         }
 
-        private static uint sequenceNumber = 0;
+        private static int sequenceNumber = 0;
 
         /// <summary>
         /// Internal function provides next number for CSTA command
         /// </summary>
         /// <returns></returns>
-        private uint nextNumber()
+        private int nextNumber()
         {
             sequenceNumber++;
             if (sequenceNumber == 9999) {
@@ -629,18 +631,18 @@ namespace BaseCSTA
         /// </summary>
         /// <param name="text">CSTA command message string</param>
         /// <returns></returns>
-        private async Task sendText(string text)
+        private async Task<int> sendText(string text)
         {
             if (!CoreApplication.Properties.ContainsKey("connected"))
             {
-                return;
+                return -1;
             }
 
             object outValue;
             StreamSocket socket;
             if (!CoreApplication.Properties.TryGetValue("clientSocket", out outValue))
             {
-                return;
+                return -1;
             }
 
             Debug.WriteLine(text, "CSTA");
@@ -649,9 +651,10 @@ namespace BaseCSTA
             IOutputStream writeStream = socket.OutputStream;
 
             byte[] data;
+            int sequence = nextNumber();
             lock (sendLock)
             {
-                string strSequence = String.Format("{0,4:D4}", nextNumber());
+                string strSequence = String.Format("{0,4:D4}", sequence);
                 string datastr = strSequence + text;
                 byte[] msgdata = Encoding.UTF8.GetBytes(datastr);
                 int len = msgdata.Length + 4;
@@ -670,13 +673,14 @@ namespace BaseCSTA
             }
             catch (Exception exception)
             {
+                sequence = -1;
                 // If this is an unknown status it means that the error if fatal and retry will likely fail.
                 if (SocketError.GetStatus(exception.HResult) == SocketErrorStatus.Unknown)
                 {
                     throw;
                 }
             }
-            return;
+            return sequence;
         }
 
         /// <summary>
