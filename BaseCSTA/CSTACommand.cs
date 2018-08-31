@@ -1,4 +1,15 @@
-﻿using System;
+﻿//*********************************************************
+//
+// Copyright (c) Connector73. All rights reserved.
+// This code is licensed under the MIT License (MIT).
+// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
+// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
+// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
+// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
+//
+//*********************************************************
+
+using System;
 using System.Collections.Generic;
 using Windows.Security.Cryptography;
 using Windows.Security.Cryptography.Core;
@@ -63,6 +74,19 @@ namespace BaseCSTA
         }
     }
 
+    public class KeepAliveCommand : CSTACommand
+    {
+        public KeepAliveCommand()
+        {
+            commandName = "keepalive";
+        }
+
+        public override string cmdBody()
+        {
+            return "<?xml version=\"1.0\" encoding=\"utf-8\"?><keepalive/>";
+        }
+    }
+
     public class LoginCommand : CSTACommand
     {
         private bool _clearTextPassword = false;
@@ -85,7 +109,8 @@ namespace BaseCSTA
             events = new Dictionary<string, object>()
             {
                 {"loginResponce", null},
-                {"loginFailed", null}
+                {"loginFailed", null},
+                {"Logout", null}
             };
             parameters = new Dictionary<string, string>()
             {

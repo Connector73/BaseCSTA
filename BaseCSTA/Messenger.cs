@@ -1,4 +1,15 @@
-﻿using System;
+﻿//*********************************************************
+//
+// Copyright (c) Connector73. All rights reserved.
+// This code is licensed under the MIT License (MIT).
+// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
+// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
+// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
+// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
+//
+//*********************************************************
+
+using System;
 using System.Collections.Generic;
 using Windows.ApplicationModel.Core;
 using Windows.Networking;
@@ -19,17 +30,20 @@ namespace BaseCSTA
 {
     public enum ConnectType { Plain, Secure, WebSocket, WebSocketSecure };
 
-    public class Messenger : ICSTAEvent
+    public class Messenger : ICSTAEvent, ICSTAErrorEvent
     {
         private byte[] readBuffer;
         private ThreadPoolTimer _timer = null;
 
         private Dictionary<string, object> commands = new Dictionary<string, object>()
         {
+            { "keepalive", new KeepAliveCommand() },
             { "login", new LoginCommand() }
         };
 
         event EventHandler cstaEvent;
+        event EventHandler cstaErrorEvent;
+
         private object objectLock = new Object();
 
         event EventHandler ICSTAEvent.OnEvent
@@ -50,6 +64,24 @@ namespace BaseCSTA
             }
         }
 
+        event EventHandler ICSTAErrorEvent.OnEvent
+        {
+            add
+            {
+                lock (objectLock)
+                {
+                    cstaErrorEvent += value;
+                }
+            }
+            remove
+            {
+                lock (objectLock)
+                {
+                    cstaErrorEvent -= value;
+                }
+            }
+        }
+     
         public void AddHandler(CSTACommand handler)
         {
             lock(commands)
@@ -140,8 +172,9 @@ namespace BaseCSTA
                     break;
                 case ConnectType.Secure:
                     socket = new StreamSocket();
-                    socket.Control.KeepAlive = false;
-                    socket.Control.ClientCertificate = null;
+                    socket.Control.KeepAlive = true;
+                    socket.Control.NoDelay = false;
+ //                   socket.Control.ClientCertificate = null;
                     bool shouldRetry = await TryConnectSocketWithRetryAsync(socket, hostName, port);
                     if (shouldRetry)
                     {
@@ -352,7 +385,7 @@ namespace BaseCSTA
             foreach(var pair in commands)
             {
                 CSTACommand cmd = (CSTACommand)pair.Value;
-                if (cmd.events.ContainsKey(cmdName))
+                if (cmd.events != null && cmd.events.ContainsKey(cmdName))
                 {
                     cmd.eventName = cmdName;
                     cmd.events[cmdName] = new Dictionary<string, object>();
@@ -392,7 +425,10 @@ namespace BaseCSTA
                                 command = findCommand(reader.Name);
                                 if (command != null)
                                 {
-                                    elementValues = (Dictionary<string, object>)command.events[command.eventName];
+                                    if (command.events != null)
+                                        elementValues = (Dictionary<string, object>)command.events[command.eventName];
+                                    else
+                                        elementValues = null;
                                 }
                                 else
                                 {
@@ -401,26 +437,29 @@ namespace BaseCSTA
                             }
                             else
                             {
-                                if (list.Count == 0 || curList == null)
+                                if (elementValues != null)
                                 {
-                                    curList = new List<object>();
-                                    elementValues.Add(reader.Name, curList);
-                                    list.Add(elementValues);
-                                    closedName = reader.Name;
-                                }
-                                if (reader.Name == closedName)
-                                {
-                                    Dictionary<string, object> newValues = new Dictionary<string, object>();
-                                    curList.Add(newValues);
-                                    elementValues = newValues;
-                                    closedName = null;
+                                    if (list.Count == 0 || curList == null)
+                                    {
+                                        curList = new List<object>();
+                                        elementValues.Add(reader.Name, curList);
+                                        list.Add(elementValues);
+                                        closedName = reader.Name;
+                                    }
+                                    if (reader.Name == closedName)
+                                    {
+                                        Dictionary<string, object> newValues = new Dictionary<string, object>();
+                                        curList.Add(newValues);
+                                        elementValues = newValues;
+                                        closedName = null;
+                                    }
                                 }
                             }
                             if (reader.HasAttributes) {
                                 while (reader.MoveToNextAttribute())
                                 {
                                     if (elementValues != null)
-                                    {
+                                    {                              
                                        elementValues.Add(reader.Name, reader.Value);
                                     }
 //                                    Debug.WriteLine(String.Format("  {0} = {1}", reader.Name, reader.Value));
@@ -440,17 +479,21 @@ namespace BaseCSTA
                             break;
                         case XmlNodeType.EndElement:
                             closedName = reader.Name;
-                            if (list.Count > 0 && curList[curList.Count - 1] != elementValues )
+                            if (elementValues != null)
                             {
-                                elementValues = (Dictionary <string, object>)list[list.Count - 1];
-                                list.RemoveAt(list.Count - 1);
+                                if (list.Count > 0 && curList[curList.Count - 1] != elementValues)
+                                {
+                                    elementValues = (Dictionary<string, object>)list[list.Count - 1];
+                                    list.RemoveAt(list.Count - 1);
+                                }
                             }
+
 //                            Debug.WriteLine("End Element", reader.Name);
                             break;
-                        default:
+//                        default:
 //                            Debug.WriteLine(String.Format("Other node {0} with value {1}",
 //                                            reader.NodeType, reader.Value));
-                            break;
+//                            break;
                     }
                 }
                 if (command != null)
@@ -474,10 +517,16 @@ namespace BaseCSTA
                                 await sendText(loginCmd.cmdBody());
                                 return; // do not send envent until second login attempt will be done
                             }
-                        }
-                    } else if (command.eventName == "loginResponce")
+                        } 
+                    }
+                    else if (command.eventName == "Logout")
                     {
-
+                        elementValues = (Dictionary<string, object>)command.events[command.eventName];
+                        if (elementValues.ContainsKey("mode") && (elementValues["mode"].ToString() == "forced"))
+                        {
+                            await Disconnect();
+                            throw new ApplicationException("Socket disconnected by server");
+                        }
                     }
 
                     ///////////////////////////////////////////////////////////////
@@ -505,9 +554,7 @@ namespace BaseCSTA
             await dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
                 await KeepAlive();
-                Debug.WriteLine("keepalive");
             });
-
         }
 
         private int _keepAliveTimeout = 45;
@@ -560,6 +607,15 @@ namespace BaseCSTA
             }
             catch (Exception ex)
             {
+                if (ex.GetType() == typeof(ApplicationException))
+                {
+                    EventHandler handler = cstaErrorEvent;
+                    if (handler != null)
+                    {
+                        handler(this, null);
+                    }
+                    return;
+                }
                 SocketErrorStatus status = SocketError.GetStatus(ex.HResult);
                 switch (status)
                 {
@@ -582,7 +638,7 @@ namespace BaseCSTA
         /// Close stream and disconnect from MX Server
         /// </summary>
         /// <returns></returns>
-        public void Disconnect()
+        public async Task Disconnect()
         {
             // Distroy keepalive timer before close connection
             if (_timer != null)
@@ -605,6 +661,7 @@ namespace BaseCSTA
 
                 // StreamSocket.Close() is exposed through the Dispose() method in C#.
                 // The call below explicitly closes the socket.
+                await socket.CancelIOAsync();
                 socket.Dispose();
             }
         }
@@ -648,6 +705,7 @@ namespace BaseCSTA
             Debug.WriteLine(text, "CSTA");
 
             socket = (StreamSocket)outValue;
+
             IOutputStream writeStream = socket.OutputStream;
 
             byte[] data;
@@ -669,7 +727,11 @@ namespace BaseCSTA
             // Write the locally buffered data to the network.
             try
             {
-                await writeStream.WriteAsync(data.AsBuffer());
+                uint bytes = await writeStream.WriteAsync(data.AsBuffer());
+
+                if (bytes == 0)
+                {
+                    throw new ApplicationException("Socket write error");                }
             }
             catch (Exception exception)
             {
@@ -689,20 +751,21 @@ namespace BaseCSTA
         /// <param name="login">Login name</param>
         /// <param name="password">Password</param>
         /// <returns></returns>
-        public async Task Login(string login, string password)
+        public async Task Login(string login, string password, string type = "User", string platform = "iPhone", string version = "7.0")
         {
             LoginCommand loginCmd = (LoginCommand)commands["login"];
-            loginCmd.parameters["type"] = "User";
-            loginCmd.parameters["platform"] = "iPhone";
+            loginCmd.parameters["type"] = type;
+            loginCmd.parameters["platform"] = platform;
             loginCmd.parameters["userName"] = login;
-            loginCmd.parameters["version"] = "7.0";
+            loginCmd.parameters["version"] = version;
             loginCmd.parameters["pwd"] = password;
             await sendText(loginCmd.cmdBody());
         }
 
         private async Task KeepAlive()
         {
-            await sendText("<?xml version=\"1.0\" encoding=\"utf-8\"?><keepalive/>");
+            KeepAliveCommand command = (KeepAliveCommand)commands["keepalive"];
+            await sendText(command.cmdBody());
         }
     }
 }
