@@ -35,7 +35,7 @@ MXvitual must stay untouched! No patches or changes should be necessary to use t
 ## Test account
 
 All units tests have a preconfigured test account. This account is limited and don't provide support for many instances.
-Please don't hesitate to ask us for additional test servers and accounts.
+Please don't hesitate to ask us for additional test servers and accounts via email: support@connector73.com.
 
 ## Contributing
 
