@@ -13,7 +13,7 @@
 
   <Properties>
     <DisplayName>UnitTests</DisplayName>
-    <PublisherDisplayName>maximd</PublisherDisplayName>
+    <PublisherDisplayName>Maxim Donchenko</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 

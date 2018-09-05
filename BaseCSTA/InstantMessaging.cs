@@ -41,6 +41,10 @@ namespace BaseCSTA
 
         public override string cmdBody()
         {
+            if (parameters["text"].Length > 32 * 1024)
+            {
+                throw new ArgumentException("Message text size is too long", "text");
+            }
             return string.Format("<?xml version=\"1.0\" encoding=\"utf-8\"?><message to=\"{0}\" msgId=\"{1}\" ext=\"{2}\">{3}</message>",
                 parameters["userId"], generateMessageId(), parameters["ext"], stringByEscapingCriticalXMLEntities(parameters["text"]));
         }
@@ -101,7 +105,7 @@ namespace BaseCSTA
                 dt = Convert.ToDateTime(parameters["timestamp"]);
                 return ConvertToUnixTimestamp(dt).ToString();
             }
-            catch (Exception ex)
+            catch
             {
                 return parameters["timestamp"];
             }

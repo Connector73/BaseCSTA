@@ -553,7 +553,19 @@ namespace BaseCSTA
             var dispatcher = CoreApplication.MainView.CoreWindow.Dispatcher;
             await dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
-                await KeepAlive();
+                try
+                {
+                    await KeepAlive();
+                }
+                catch
+                {
+                    await Disconnect();
+                    EventHandler handler = cstaErrorEvent;
+                    if (handler != null)
+                    {
+                        handler(this, null);
+                    }
+                }
             });
         }
 
@@ -731,7 +743,8 @@ namespace BaseCSTA
 
                 if (bytes == 0)
                 {
-                    throw new ApplicationException("Socket write error");                }
+                    throw new ApplicationException("Socket write error");
+                }
             }
             catch (Exception exception)
             {

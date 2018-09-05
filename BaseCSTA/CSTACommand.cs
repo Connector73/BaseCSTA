@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Security;
 using Windows.Security.Cryptography;
 using Windows.Security.Cryptography.Core;
 using Windows.Storage.Streams;
@@ -42,12 +43,7 @@ namespace BaseCSTA
 
         public string stringByEscapingCriticalXMLEntities(string text)
         {
-            string mutable = text.Replace("&", "&amp;");
-            mutable = mutable.Replace("<", "&lt;");
-            mutable = mutable.Replace(">", "&gt;");
-            mutable = mutable.Replace("'", "&#x27;");
-            mutable = mutable.Replace("\"", "&quot;");
-            return mutable;
+            return SecurityElement.Escape(text);
         }
 
         public string stringByUnescapingCrititcalXMLEntities(string text)
